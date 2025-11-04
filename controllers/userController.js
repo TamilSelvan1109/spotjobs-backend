@@ -466,51 +466,20 @@ export const applyForJob = async (req, res) => {
       date: Date.now(),
     });
 
-    // Trigger high-precision Lambda scoring
+    // Trigger simple Lambda scoring
     try {
       const lambdaPayload = {
-        jobTitle: jobData.title,
-        jobDescription: jobData.description,
-        jobLocation: jobData.location,
-        jobCategory: jobData.category,
-        jobLevel: jobData.level,
-        jobSalary: jobData.salary,
         requiredSkills: jobData.skills || [],
         userSkills: userData.profile?.skills || [],
-        userBio: userData.profile?.bio || '',
-        userRole: userData.profile?.role || '',
-        resumeUrl: userData.profile?.resume || '',
         applicationId: application._id.toString(),
         backendUrl: process.env.BACKEND_URL || 'http://localhost:5000'
       };
 
-      console.log('\n🚀 ===== TRIGGERING LAMBDA SCORING =====');
-      console.log('📋 Application Details:', {
-        applicationId: application._id.toString(),
-        jobTitle: jobData.title,
-        jobLevel: jobData.level,
-        hasDescription: !!jobData.description,
-        descriptionLength: jobData.description?.length || 0,
-        requiredSkillsCount: (jobData.skills || []).length,
-        requiredSkills: jobData.skills || []
-      });
-      
-      console.log('👤 User Profile Details:', {
-        userId: userData._id.toString(),
-        userRole: userData.profile?.role || 'Not specified',
-        userSkillsCount: (userData.profile?.skills || []).length,
-        userSkills: userData.profile?.skills || [],
-        hasBio: !!userData.profile?.bio,
-        bioLength: userData.profile?.bio?.length || 0,
-        hasResume: !!userData.profile?.resume,
-        resumeUrl: userData.profile?.resume || 'No resume'
-      });
-      
-      console.log('🔗 Lambda Configuration:', {
-        functionName: process.env.LAMBDA_FUNCTION_NAME || 'resumeScoring',
-        backendUrl: process.env.BACKEND_URL || 'http://localhost:5000',
-        region: process.env.AWS_REGION
-      });
+      console.log('🚀 Starting resume scoring');
+      console.log('📋 Job:', jobData.title);
+      console.log('🎯 Required skills:', jobData.skills || []);
+      console.log('👤 User skills:', userData.profile?.skills || []);
+      console.log('🆔 Application ID:', application._id.toString());
 
       const command = new InvokeCommand({
         FunctionName: process.env.LAMBDA_FUNCTION_NAME || 'resumeScoring',
@@ -522,20 +491,16 @@ export const applyForJob = async (req, res) => {
       
       console.log('✅ Lambda invocation successful:', {
         statusCode: result.StatusCode,
-        applicationId: application._id.toString(),
-        functionName: process.env.LAMBDA_FUNCTION_NAME || 'resumeScoring',
-        payload: result.Payload ? 'Present' : 'None'
+        applicationId: application._id.toString()
       });
       
-      console.log('=====================================\n');
-      
     } catch (lambdaError) {
-      console.error('Lambda invocation failed:', lambdaError.message);
+      console.error('❌ Lambda invocation failed:', lambdaError.message);
     }
 
     res.json({ 
       success: true, 
-      message: "Applied Successfully - High-precision scoring in progress",
+      message: "Applied Successfully - Resume scoring in progress",
       applicationId: application._id.toString()
     });
   } catch (error) {
@@ -612,48 +577,24 @@ export const updateUserResume = async (req, res) => {
 // Update application score from Lambda
 export const updateApplicationScore = async (req, res) => {
   try {
-    const { applicationId, score, scoringDetails, error, errorMessage } = req.body;
+    const { applicationId, score, error, errorMessage } = req.body;
     
     if (error) {
-      console.error('❌ Lambda scoring error:', {
+      console.error('❌ Resume scoring failed:', {
         applicationId,
-        errorMessage,
-        timestamp: new Date().toISOString()
+        error: errorMessage
       });
       return res.json({ success: false, message: "Scoring failed", error: errorMessage });
     }
     
-    console.log('\n🎯 ===== RESUME SCORING COMPLETED =====');
+    console.log('🎯 Resume scoring completed');
     console.log('📋 Application ID:', applicationId);
-    console.log('🏆 Final Score:', score + '%');
-    console.log('⏰ Timestamp:', new Date().toISOString());
+    console.log('🏆 Score:', score + '%');
     
-    if (scoringDetails) {
-      console.log('\n📊 DETAILED SCORING BREAKDOWN:');
-      console.log('  🎯 Skills Match:', `${scoringDetails.breakdown.skillsMatch.score}% (${scoringDetails.breakdown.skillsMatch.matched}/${scoringDetails.breakdown.skillsMatch.total} skills)`);
-      console.log('  📝 Description Match:', `${scoringDetails.breakdown.descriptionMatch.score}%`);
-      console.log('  👤 Role Match:', `${scoringDetails.breakdown.roleMatch.score}%`);
-      console.log('  📈 Experience Match:', `${scoringDetails.breakdown.experienceMatch.score}%`);
-      console.log('  📄 Resume Quality:', `${scoringDetails.breakdown.resumeQuality.score}%`);
-      
-      if (scoringDetails.matchedSkills?.length > 0) {
-        console.log('\n✅ MATCHED SKILLS:', scoringDetails.matchedSkills.join(', '));
-      }
-      
-      console.log('\n💡 RECOMMENDATION:', scoringDetails.recommendation);
-      console.log('📄 Textract Used:', scoringDetails.textractUsed ? 'Yes' : 'No');
-      console.log('📏 Resume Length:', scoringDetails.resumeTextLength + ' characters');
-    }
-    
-    console.log('\n=====================================\n');
-    
-    // Update application with score and details
+    // Update application with score
     const application = await JobApplication.findByIdAndUpdate(
       applicationId,
-      { 
-        score,
-        scoringDetails: scoringDetails || null
-      },
+      { score },
       { new: true }
     );
     
@@ -662,14 +603,13 @@ export const updateApplicationScore = async (req, res) => {
       return res.json({ success: false, message: "Application not found" });
     }
     
-    console.log('💾 Application updated successfully in database');
+    console.log('✅ Score updated in database');
     
     return res.json({ 
       success: true, 
-      message: "Score and details updated successfully",
+      message: "Score updated successfully",
       applicationId,
-      score,
-      recommendation: scoringDetails?.recommendation
+      score
     });
     
   } catch (error) {
