@@ -475,7 +475,7 @@ export const applyForJob = async (req, res) => {
         backendUrl: process.env.BACKEND_URL || 'http://localhost:5000'
       };
 
-      console.log('🚀 Starting resume scoring');
+      console.log('🚀 Starting skill matching');
       console.log('📋 Job:', jobData.title);
       console.log('🎯 Required skills:', jobData.skills || []);
       console.log('👤 User skills:', userData.profile?.skills || []);
@@ -500,7 +500,7 @@ export const applyForJob = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: "Applied Successfully - Resume scoring in progress",
+      message: "Applied Successfully",
       applicationId: application._id.toString()
     });
   } catch (error) {
